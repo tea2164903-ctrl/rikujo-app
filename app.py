@@ -11,7 +11,6 @@ st.set_page_config(page_title="陸上部 記録管理アプリ", layout="wide")
 # 🔒 セキュリティ設定（パスワード機能）
 # ==========================================
 # 【ここを好きなパスワードに変えてください！】
-# 半角の英数字や記号で、推測されにくいものを設定してください。
 CORRECT_PASSWORD = "genyo2018" 
 
 # パスワード認証のチェック
@@ -28,7 +27,7 @@ if not st.session_state.authenticated:
             st.rerun()
         else:
             st.error("パスワードが違います。")
-    st.stop() # パスワードが違う場合は、ここでプログラムを強制ストップ（下の画面を見せない）
+    st.stop() # パスワードが違う場合はここでストップ
 # ==========================================
 
 # --- ここから下はログイン成功時のみ実行される ---
@@ -94,13 +93,14 @@ if uploaded_file is not None and st.button("PDFからデータを抽出して蓄
                             if score_match:
                                 score = score_match.group(1)
                             
+                            # 【ここを正しく修正しました！】
                             extracted_rows.append({
                                 "日付": str(meet_date),
                                 "大会名": meet_name,
                                 "種目": current_event,
                                 "氏名": name,
                                 "学年/年齢": grade,
-                                "所属",: school,
+                                "所属": school,
                                 "記録": score
                             })
         
