@@ -7,16 +7,40 @@ import os
 
 st.set_page_config(page_title="陸上部 記録管理アプリ", layout="wide")
 
+# ==========================================
+# 🔒 セキュリティ設定（パスワード機能）
+# ==========================================
+# 【ここを好きなパスワードに変えてください！】
+# 半角の英数字や記号で、推測されにくいものを設定してください。
+CORRECT_PASSWORD = "genyo2018" 
+
+# パスワード認証のチェック
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.title("🔒 ログインが必要です")
+    user_password = st.text_input("パスワードを入力してください", type="password")
+    if st.button("ログイン"):
+        if user_password == CORRECT_PASSWORD:
+            st.session_state.authenticated = True
+            st.success("ログインに成功しました！")
+            st.rerun()
+        else:
+            st.error("パスワードが違います。")
+    st.stop() # パスワードが違う場合は、ここでプログラムを強制ストップ（下の画面を見せない）
+# ==========================================
+
+# --- ここから下はログイン成功時のみ実行される ---
 st.title("🏃‍♂️ 陸上競技部 記録管理・推移アプリ")
 st.write("大会の結果PDFを読み込ませて、自校の生徒の記録を自動で抽出し、個人ページを作成します。")
 
 # --- サイドバーで学校名を設定 ---
 target_school = st.sidebar.text_input("抽出する学校名を入力してください", value="玄洋中")
 
-# --- データの保存・読み込みの仕組み（CSVファイルで永続化） ---
+# --- データの保存・読み込みの仕組み ---
 DB_FILE = "rikujo_saved_database.csv"
 
-# 既に保存されているデータがあれば読み込む、なければ空の表を作る
 if os.path.exists(DB_FILE):
     try:
         st.session_state.all_data = pd.read_csv(DB_FILE)
@@ -76,19 +100,16 @@ if uploaded_file is not None and st.button("PDFからデータを抽出して蓄
                                 "種目": current_event,
                                 "氏名": name,
                                 "学年/年齢": grade,
-                                "所属": school,
+                                "所属",: school,
                                 "記録": score
                             })
         
         if extracted_rows:
             new_df = pd.DataFrame(extracted_rows)
-            # 既存データと結合して重複を排除
             st.session_state.all_data = pd.concat([st.session_state.all_data, new_df], ignore_index=True).drop_duplicates()
-            
-            # ファイルに保存する
             st.session_state.all_data.to_csv(DB_FILE, index=False, encoding="utf-8-sig")
             st.success(f"成功！{target_school}の生徒を {len(new_df)} 件抽出してデータベースに保存しました！")
-            st.rerun() # 画面を更新して最新データを反映
+            st.rerun()
         else:
             st.warning(f"指定された学校（{target_school}）の生徒が見つかりませんでした。")
 
@@ -111,11 +132,8 @@ if not df_saved.empty:
     for i, event in enumerate(events):
         with tabs[i]:
             event_df = student_df[student_df["種目"] == event].sort_values(by="日付")
-            
-            # トラック種目かフィールド種目かを判定してベストを決めるロジック
             is_field = "跳" in event or "投" in event
             
-            # 文字列を比較用の数値に変換する関数
             def to_num(val):
                 try:
                     if ":" in str(val):
@@ -125,7 +143,6 @@ if not df_saved.empty:
                 except:
                     return 999999 if not is_field else -1
 
-            # ベストの判定
             event_df["_num_score"] = event_df["記録"].apply(to_num)
             
             if is_field:
@@ -139,8 +156,7 @@ if not df_saved.empty:
                 year_df = event_df[event_df["日付"].str.startswith(current_year)]
                 sb_row = year_df.loc[year_df["_num_score"].idxmin()]
             
-            # 画面上に大きな数字（メトリック）でベスト記録を表示
-            b_col1, b_col2, b_col3 = st.columns(3)
+            b_col1, b_col2 = st.columns(2)
             with b_col1:
                 st.metric(label="🏆 自己ベスト (PB)", value=pb_row["記録"], delta=f"({pb_row['大会名']})", delta_color="off")
             with b_col2:
@@ -150,19 +166,15 @@ if not df_saved.empty:
             st.write(f"**【出場履歴と記録一覧】**")
             st.dataframe(event_df[["日付", "大会名", "記録"]], use_container_width=True)
             
-            # グラフ化
             fig = px.line(event_df, x="日付", y="記録", hover_data=["大会名"], title=f"{event} 記録推移", markers=True)
-            # 【ここを修正！】トラック種目の場合はグラフの縦軸（Y軸）を反転させて、速い記録が上に来るようにする
             if not is_field:
                 fig.update_yaxes(autorange="reversed")
                 
             st.plotly_chart(fig, use_container_width=True)
             
-    # 全体データの管理エリア
     st.write("---")
     with st.expander("🛠️ 蓄積された全データベースの確認・削除"):
         st.dataframe(df_saved)
-        
         col_dl, col_del = st.columns(2)
         with col_dl:
             csv = df_saved.to_csv(index=False).encode('utf-8-sig')
